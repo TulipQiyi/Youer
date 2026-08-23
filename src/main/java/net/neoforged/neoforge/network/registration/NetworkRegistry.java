@@ -522,6 +522,17 @@ public class NetworkRegistry {
                 return;
             }
 
+            // Youer: Only NeoForge (modded) connections require a channel to be negotiated before a
+            // payload may be sent. Vanilla / other connections (e.g. Geyser's upstream Java client)
+            // legally receive any plugin-channel payload and simply ignore unknown channels, matching
+            // vanilla Paper/Spigot behaviour. Without this, Floodgate plugin messages such as
+            // floodgate:form would be rejected here on vanilla connections (the channel is never part
+            // of the connection's negotiated payload setup for non-modded clients).
+            ConnectionType connectionType = listener.getConnectionType();
+            if (connectionType == null || !connectionType.isNeoForge()) {
+                return;
+            }
+
             throw new UnsupportedOperationException("Payload %s may not be sent to the client!".formatted(id));
         }
     }

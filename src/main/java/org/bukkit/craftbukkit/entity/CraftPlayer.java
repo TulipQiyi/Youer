@@ -106,7 +106,6 @@ import net.minecraft.network.protocol.game.ClientboundTabListPacket;
 import net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket;
 import net.minecraft.network.protocol.game.ClientboundUpdateMobEffectPacket;
 import net.minecraft.resources.Identifier;
-import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.server.PlayerAdvancements;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
@@ -140,7 +139,6 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.payload.MinecraftRegisterPayload;
-import net.neoforged.neoforge.network.registration.NetworkRegistry;
 import org.bukkit.BanEntry;
 import org.bukkit.BanList;
 import org.bukkit.Bukkit;
@@ -2311,11 +2309,15 @@ public class CraftPlayer extends CraftHumanEntity implements Player, PluginMessa
         if (this.getHandle().connection == null) return;
 
         Identifier id = Identifier.parse(StandardMessenger.validateAndCorrectChannel(channel));
-        // Accept channels the client declared via vanilla minecraft:register (pluginMessagerChannels) or channels
-        // negotiated by a NeoForge modded client (ChannelAttributes).
-        if (this.channels().contains(channel) || NetworkRegistry.hasChannel(this.getHandle().connection.getConnection(), ConnectionProtocol.PLAY, id)) {
-            ((StandardMessenger) this.server.getMessenger()).sendCustomPayload(source, this, id, message);
-        }
+        // Youer: Always send payloads on channels that plugins registered as outgoing, matching
+        // vanilla Paper/Spigot behaviour. Whether the payload may actually be sent to the client is
+        // enforced by NetworkRegistry.checkPacket in ServerCommonPacketListenerImpl#send, which only
+        // rejects un-negotiated channels on NeoForge (modded) connections. Vanilla connections (e.g.
+        // Geyser's upstream Java client) legally receive any plugin-channel payload and simply ignore
+        // unknown channels, so gating on client registration here would silently drop Floodgate forms
+        // and similar plugin messages (floodgate:form is never present in pluginMessagerChannels
+        // because NeoForge intercepts minecraft:register before the Paper channel tracking runs).
+        ((StandardMessenger) this.server.getMessenger()).sendCustomPayload(source, this, id, message);
     }
 
     private void sendCustomPayload(Identifier id, byte[] message) {
